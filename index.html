@@ -1071,7 +1071,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--ga); }
             <div class="ai-gen-sub">AI sẽ tạo câu hỏi trắc nghiệm 4 đáp án đúng chương trình THCS,<br>phù hợp đúng môn và khối lớp bạn chọn.</div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end; flex-shrink:0;">
-            <span class="badge badge-ai">✦ Claude AI</span>
+            <span class="badge badge-ai">✦ Gemini AI</span>
             <span class="badge badge-new">✨ Tự động</span>
           </div>
         </div>
@@ -1108,14 +1108,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--ga); }
         <!-- API Key -->
         <div class="api-key-row">
           <div class="api-key-header">
-            <span class="api-key-label">🔑 Anthropic API Key</span>
-            <a href="https://console.anthropic.com/account/keys" target="_blank" class="api-key-link">Lấy key miễn phí ↗</a>
+            <span class="api-key-label">🔑 Google Gemini API Key</span>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="api-key-link">Lấy key miễn phí tại AI Studio ↗</a>
           </div>
           <div class="api-key-input-wrap">
-            <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." autocomplete="off" oninput="onKeyInput()">
+            <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off" oninput="onKeyInput()">
             <button class="api-key-toggle" onclick="toggleKeyVis()" title="Hiện/ẩn key">👁</button>
           </div>
-          <div class="api-key-hint" id="api-key-hint">Nhập Anthropic API Key để AI tạo câu hỏi. Key chỉ lưu trên trình duyệt của bạn.</div>
+          <div class="api-key-hint" id="api-key-hint">Nhập Google Gemini API Key (miễn phí). Key chỉ lưu trên trình duyệt của bạn.</div>
         </div>
 
         <div class="gen-btn-row">
@@ -1300,7 +1300,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--ga); }
   <div class="ago-title">AI đang tạo câu hỏi...</div>
   <div class="ago-status" id="ago-status">Đang phân tích môn học và khối lớp để tạo câu hỏi phù hợp nhất...</div>
   <div class="ago-progress"><div class="ago-bar" id="ago-bar"></div></div>
-  <div class="ago-tip">💡 AI sẽ tạo câu hỏi đúng chương trình THCS hiện hành</div>
+  <div class="ago-tip">💡 Gemini AI sẽ tạo câu hỏi đúng chương trình THCS hiện hành</div>
 </div>
 
 <!-- Feedback overlay -->
@@ -1393,7 +1393,7 @@ const S = {
 /* ============================================================
    API KEY MANAGEMENT
    ============================================================ */
-const KEY_STORAGE = 'keco_anthropic_key';
+const KEY_STORAGE = 'keco_gemini_key';
 
 function getApiKey() {
   return document.getElementById('api-key-input').value.trim() ||
@@ -1409,16 +1409,16 @@ function onKeyInput() {
   if (!val) {
     inp.className = '';
     hint.className = 'api-key-hint';
-    hint.textContent = 'Nhập Anthropic API Key để AI tạo câu hỏi. Key chỉ lưu trên trình duyệt của bạn.';
+    hint.textContent = 'Nhập Google Gemini API Key (miễn phí). Key chỉ lưu trên trình duyệt của bạn.';
     genBtn.disabled = true;
     return;
   }
 
-  if (val.startsWith('sk-ant-')) {
+  if (val.startsWith('AIza') || val.length > 20) {
     inp.classList.add('key-ok');
     inp.classList.remove('key-err');
     hint.className = 'api-key-hint ok';
-    hint.textContent = '✅ API Key hợp lệ — sẵn sàng tạo câu hỏi!';
+    hint.textContent = '✅ Gemini API Key hợp lệ — sẵn sàng tạo câu hỏi!';
     genBtn.disabled = false;
     // Lưu key vào localStorage
     localStorage.setItem(KEY_STORAGE, val);
@@ -1426,7 +1426,7 @@ function onKeyInput() {
     inp.classList.add('key-err');
     inp.classList.remove('key-ok');
     hint.className = 'api-key-hint err';
-    hint.textContent = '❌ Key không đúng định dạng. Key phải bắt đầu bằng sk-ant-';
+    hint.textContent = '❌ Key không hợp lệ. Gemini Key thường bắt đầu bằng AIza...';
     genBtn.disabled = true;
   }
 }
@@ -1588,61 +1588,103 @@ async function generateQuestions(append = false) {
        ---------------------------------------------------------- */
     const apiKey = getApiKey();
     if (!apiKey) {
-      showErrorToast('Vui lòng nhập Anthropic API Key trước khi tạo câu hỏi!');
+      showErrorToast('Vui lòng nhập Google Gemini API Key trước khi tạo câu hỏi!');
       return;
     }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
+    /* ----------------------------------------------------------
+       Gemini API — gemini-2.0-flash-lite, gọi trực tiếp từ browser
+       ---------------------------------------------------------- */
+    const GEMINI_URL =
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
+
+    const systemInstruction =
+      `Bạn là chuyên gia giáo dục THCS Việt Nam. ` +
+      `Tạo câu hỏi trắc nghiệm 4 lựa chọn đúng chương trình THCS Việt Nam. ` +
+      `"c" là số nguyên 0, 1, 2 hoặc 3 — chỉ vị trí đáp án đúng trong mảng opts. ` +
+      `opts là mảng 4 chuỗi, không có tiền tố A. B. C. D.`;
+
+    // responseSchema giúp Gemini luôn trả về đúng cấu trúc JSON
+    const responseSchema = {
+      type: "object",
+      properties: {
+        questions: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              q:       { type: "string" },
+              opts:    { type: "array", items: { type: "string" }, minItems: 4, maxItems: 4 },
+              c:       { type: "integer", minimum: 0, maximum: 3 },
+              explain: { type: "string" }
+            },
+            required: ["q", "opts", "c"]
+          }
+        }
       },
+      required: ["questions"]
+    };
+
+    const response = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4000,
-        system: [
-          "Bạn là chuyên gia giáo dục THCS Việt Nam.",
-          "Nhiệm vụ: tạo câu hỏi trắc nghiệm 4 lựa chọn đúng chương trình THCS Việt Nam.",
-          "QUAN TRỌNG: Chỉ trả về đúng một JSON object, không có text nào khác, không có markdown, không có ```json.",
-          "Format bắt buộc (giữ đúng key name):",
-          '{"questions":[{"q":"Nội dung câu hỏi?","opts":["Đáp án A","Đáp án B","Đáp án C","Đáp án D"],"c":0,"explain":"Giải thích ngắn"}]}',
-          'Trong đó "c" là số nguyên 0-3 chỉ vị trí đáp án đúng trong mảng opts.',
-          'opts là mảng 4 string, KHÔNG có tiền tố "A. " "B. " v.v.'
-        ].join("\n"),
-        messages: [{ role: "user", content: prompt }]
+        system_instruction: { parts: [{ text: systemInstruction }] },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 4000,
+          responseMimeType: "application/json",
+          responseSchema: responseSchema
+        }
       })
     });
 
     /* ----------------------------------------------------------
-       Kiểm tra HTTP status trước khi parse
+       Kiểm tra HTTP status
        ---------------------------------------------------------- */
     if (!response.ok) {
       const errBody = await response.text();
-      throw new Error(`API HTTP ${response.status}: ${errBody.slice(0, 200)}`);
+      let errMsg = `API HTTP ${response.status}`;
+      try {
+        const errJson = JSON.parse(errBody);
+        errMsg += ': ' + (errJson?.error?.message || errBody.slice(0, 200));
+      } catch { errMsg += ': ' + errBody.slice(0, 200); }
+      throw new Error(errMsg);
     }
 
     const data = await response.json();
+    console.log("Gemini raw response:", JSON.stringify(data).slice(0, 300));
 
-    // Lấy text từ response
-    const raw = (data.content || [])
-      .filter(b => b.type === "text")
-      .map(b => b.text)
-      .join("") || "";
+    // Khi dùng responseMimeType="application/json" + responseSchema,
+    // Gemini trả JSON trong parts[0].text dưới dạng string đã được parse sẵn
+    const part = data?.candidates?.[0]?.content?.parts?.[0];
+    const finishReason = data?.candidates?.[0]?.finishReason;
 
-    if (!raw.trim()) throw new Error("AI trả về nội dung rỗng");
+    if (!part) {
+      const blockReason = data?.promptFeedback?.blockReason || finishReason;
+      throw new Error(`Gemini không trả về dữ liệu${blockReason ? ': ' + blockReason : ''}`);
+    }
+
+    // parts[0].text là JSON string khi dùng responseMimeType
+    const raw = typeof part.text === "string" ? part.text : JSON.stringify(part);
+
+    if (!raw || !raw.trim()) throw new Error("Gemini trả về nội dung rỗng");
 
     /* ----------------------------------------------------------
        Parse JSON — thử nhiều cách để xử lý mọi tình huống
        ---------------------------------------------------------- */
     let parsed = null;
 
-    // Cách 1: parse thẳng nếu response là JSON thuần
+    // Cách 1: parse thẳng (Gemini với responseSchema trả JSON string)
     try { parsed = JSON.parse(raw.trim()); } catch (_) {}
 
-    // Cách 2: tìm JSON object đầu tiên với depth tracking (chính xác hơn regex .*/)
+    // Cách 2: raw đã là object (Gemini đôi khi trả object trực tiếp)
+    if (!parsed && typeof raw === "object" && raw !== null) {
+      parsed = raw;
+    }
+
+    // Cách 3: tìm khối JSON đầu tiên trong string
     if (!parsed) {
       const start = raw.indexOf('{');
       const end   = raw.lastIndexOf('}');
@@ -1651,7 +1693,7 @@ async function generateQuestions(append = false) {
       }
     }
 
-    // Cách 3: bóc markdown code block nếu AI vẫn bọc ```
+    // Cách 4: bóc markdown code block nếu có
     if (!parsed) {
       const mdMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
       if (mdMatch) {
@@ -1660,8 +1702,9 @@ async function generateQuestions(append = false) {
     }
 
     if (!parsed || !Array.isArray(parsed.questions) || parsed.questions.length === 0) {
-      console.error("Raw AI response:", raw);
-      throw new Error("Không thể đọc dữ liệu từ AI. Xem console để debug.");
+      console.error("Gemini raw text:", raw);
+      console.error("Gemini full data:", JSON.stringify(data));
+      throw new Error("Không đọc được dữ liệu từ Gemini. Mở Console (F12) để xem chi tiết.");
     }
 
     /* ----------------------------------------------------------
